@@ -20,7 +20,7 @@
 - **Propósito**: Capturar eventos del sistema ejemplo el mensaje del sinpe.
 -
 #### 6. `service/`
-- **Propósito**: Mantener la aplicación activa en segundo plano.
+- **Propósito**: Mantener la aplicación activa en segundo planoo.
 
 #### 7. `utils/`
 - **Propósito**: Código reutilizable que no pertenece a ninguna capa específica.
