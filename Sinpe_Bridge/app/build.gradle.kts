@@ -17,7 +17,6 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -30,16 +29,20 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
     }
 }
 
 dependencies {
+    // ── Ya tenías estas ──────────────────────────────────────────────────────
+    implementation("com.google.code.gson:gson:2.10.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -48,6 +51,17 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // ── AGREGAR: íconos extendidos (CheckCircle, RadioButtonUnchecked) ───────
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // ── AGREGAR: ViewModel con Compose (viewModels() + collectAsState()) ─────
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+
+    // ── AGREGAR: Coroutines para las llamadas HTTP al backend ─────────────────
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // ── Tests (no tocar) ─────────────────────────────────────────────────────
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
