@@ -30,7 +30,8 @@ import com.example.sinpe_bridge.utils.SinpeParser
 data class SmsRaw(
     val remitente: String,
     val cuerpo: String,
-    val fecha: String
+    val timestampMs: Long,        // epoch ms real del SMS
+    val fecha: String             // formateado para mostrar
 )
 
 class DiagnosticoActivity : ComponentActivity() {
@@ -221,7 +222,7 @@ fun leerSmsBN(context: android.content.Context): List<SmsRaw> {
                     remitente.contains("sinpe", ignoreCase = true) ||
                     remitente.contains("BN", ignoreCase = true)
                 ) {
-                    lista.add(SmsRaw(remitente, cuerpo, fecha))
+                    lista.add(SmsRaw(remitente, cuerpo, fechaMs, fecha))
                 }
             }
         }

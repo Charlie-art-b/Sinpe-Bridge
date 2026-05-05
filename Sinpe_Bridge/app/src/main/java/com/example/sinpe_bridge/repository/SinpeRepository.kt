@@ -1,6 +1,7 @@
 package com.example.sinpe_bridge.repository
 
 import android.util.Log
+import com.example.sinpe_bridge.data.remote.api.BackendClient
 import com.example.sinpe_bridge.model.EstadoValidacion
 import com.example.sinpe_bridge.model.SinpeMessage
 import com.example.sinpe_bridge.model.SinpePaymentItem
@@ -18,15 +19,30 @@ object SinpeRepository {
     private val _pagos = MutableStateFlow<List<SinpePaymentItem>>(emptyList())
     val pagos: StateFlow<List<SinpePaymentItem>> = _pagos.asStateFlow()
 
-    /**
-     * Agrega un nuevo pago recibido por SMS. El más reciente queda primero.
-     */
     fun agregarPago(mensaje: SinpeMessage) {
         val nuevo = SinpePaymentItem(sinpeMessage = mensaje)
         _pagos.update { lista ->
-            listOf(nuevo) + lista  // más reciente primero
+            (listOf(nuevo) + lista)
+                .sortedByDescending { it.sinpeMessage.timestampMs }
         }
         Log.d("SinpeRepository", "Pago agregado: ${nuevo.id} - Ref: ${mensaje.referencia}")
+    }
+
+    /**
+     * Carga un lote de pagos del historial de una sola vez, ordenados de más
+     * reciente a más antiguo por timestampMs. Evita duplicados por referencia.
+     */
+    fun cargarLote(mensajes: List<SinpeMessage>) {
+        val existentes = _pagos.value.map { it.sinpeMessage.referencia }.toSet()
+        val nuevos = mensajes
+            .filter { it.referencia !in existentes }
+            .map { SinpePaymentItem(sinpeMessage = it) }
+
+        _pagos.update { lista ->
+            (lista + nuevos)
+                .sortedByDescending { it.sinpeMessage.timestampMs }
+        }
+        Log.d("SinpeRepository", "Lote cargado: ${nuevos.size} pagos nuevos")
     }
 
     /**

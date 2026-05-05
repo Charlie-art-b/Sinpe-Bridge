@@ -1,6 +1,8 @@
-package com.example.sinpe_bridge.repository
+package com.example.sinpe_bridge.data.remote.api
 
 import android.util.Log
+import com.example.sinpe_bridge.data.remote.mapper.toDto
+import com.example.sinpe_bridge.data.remote.dto.SinpeResponseDto
 import com.example.sinpe_bridge.model.SinpePaymentItem
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -9,31 +11,14 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * Cliente HTTP que envía el SINPE al backend y devuelve el resultado de validación.
- *
- * Protocolo esperado:
- *   POST /api/validar-sinpe
- *   Content-Type: application/json
- *   Body: { "id", "monto", "nombrePagador", "referencia", "fechaHora", "textoOriginal" }
- *
- *   Response 200: { "valido": true/false, "motivo": "..." }
- *   Response 4xx/5xx: se lanza excepción
- */
 object BackendClient {
 
-    // ⚙️  Cambia esta URL por la de tu servidor
-    private const val BASE_URL = "http://10.0.2.2:8080"  // localhost desde emulador
+    private const val BASE_URL = "http://10.0.2.2:8080"
     private const val ENDPOINT = "/api/validar-sinpe"
     private const val TIMEOUT_MS = 30_000
 
     private val gson = Gson()
 
-    /**
-     * Envía el pago al backend. Corre en IO dispatcher.
-     * @return true si es válido, false si es rechazado
-     * @throws Exception si hay error de red o respuesta inesperada
-     */
     suspend fun enviarSinpe(item: SinpePaymentItem): Boolean = withContext(Dispatchers.IO) {
         val url = URL("$BASE_URL$ENDPOINT")
         val connection = url.openConnection() as HttpURLConnection
@@ -48,18 +33,13 @@ object BackendClient {
                 readTimeout = TIMEOUT_MS
             }
 
-            // Construir payload
-            val payload = mapOf(
-                "id" to item.id,
-                "monto" to item.sinpeMessage.monto,
-                "nombrePagador" to item.sinpeMessage.nombrePagador,
-                "referencia" to item.sinpeMessage.referencia,
-                "fechaHora" to item.sinpeMessage.fechaHora,
-                "textoOriginal" to item.sinpeMessage.textoOriginal
-            )
-            val json = gson.toJson(payload)
+            // 🔄 Convertir a DTO
+            val dto = item.toDto()
+            val json = gson.toJson(dto)
 
-            // Enviar
+            Log.d("BackendClient", "Enviando DTO: $json")
+
+            // 📤 Enviar request
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
                 writer.write(json)
                 writer.flush()
@@ -72,21 +52,20 @@ object BackendClient {
                 val responseBody = connection.inputStream.bufferedReader().readText()
                 Log.d("BackendClient", "Body: $responseBody")
 
-                val respuesta = gson.fromJson(responseBody, BackendResponse::class.java)
-                respuesta.valido
+                val response = gson.fromJson(responseBody, SinpeResponseDto::class.java)
+                response.valido
+
             } else {
-                val errorBody = connection.errorStream?.bufferedReader()?.readText() ?: "sin detalle"
+                val errorBody =
+                    connection.errorStream?.bufferedReader()?.readText() ?: "sin detalle"
                 throw Exception("Error HTTP $responseCode: $errorBody")
             }
 
+        } catch (e: Exception) {
+            Log.e("BackendClient", "Error enviando SINPE", e)
+            false
         } finally {
             connection.disconnect()
         }
     }
-
-    /** Modelo de respuesta del backend */
-    private data class BackendResponse(
-        val valido: Boolean,
-        val motivo: String? = null
-    )
 }

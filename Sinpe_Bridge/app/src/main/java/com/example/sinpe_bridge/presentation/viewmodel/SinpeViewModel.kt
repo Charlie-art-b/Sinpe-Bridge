@@ -88,7 +88,6 @@ class SinpeViewModel : ViewModel() {
         _uiState.update { it.copy(ultimoResultado = null) }
     }
 
-    /** Limpia el mensaje de error */
     fun limpiarError() {
         _uiState.update { it.copy(mensajeError = null) }
     }

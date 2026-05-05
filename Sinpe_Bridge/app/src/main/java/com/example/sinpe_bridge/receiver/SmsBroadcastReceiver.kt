@@ -10,12 +10,24 @@ import com.example.sinpe_bridge.utils.SinpeParser
 import com.google.gson.Gson
 
 /**
- * Receptor de SMS entrantes.
- * Filtra mensajes de SINPE Móvil BN y los pasa al ForegroundService.
+ * Receptor de SMS entrantes filtrado por remitentes conocidos del BN SINPE.
  */
 class SmsBroadcastReceiver : BroadcastReceiver() {
 
     private val gson = Gson()
+
+    companion object {
+        // Remitentes conocidos del Banco Nacional para SINPE Móvil
+        // Agrega aquí cualquier otro número/shortcode que identifiques
+        private val REMITENTES_SINPE = setOf(
+            "50501",     // shortcode BN SINPE Móvil
+            "505",
+            "BN",
+            "BNCR",
+            "SINPE",
+            "BACCR",
+        )
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
@@ -23,9 +35,16 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         try {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
 
-            // Agrupar partes del mismo SMS (los SMS largos llegan en varios PDUs)
-            val mensajesAgrupados = mutableMapOf<String, StringBuilder>()
+            // ⚠️ Loguear TODOS los SMS que llegan — sirve para identificar
+            // el remitente exacto del BN en tu celular específico
+            for (sms in messages) {
+                Log.d("SmsReceiver", "=== SMS ENTRANTE ===")
+                Log.d("SmsReceiver", "Remitente : '${sms.originatingAddress}'")
+                Log.d("SmsReceiver", "Texto     : '${sms.messageBody?.take(80)}'")
+            }
 
+            // Agrupar partes del mismo SMS por remitente (SMS largos vienen en PDUs)
+            val mensajesAgrupados = mutableMapOf<String, StringBuilder>()
             for (sms in messages) {
                 val remitente = sms.originatingAddress ?: "desconocido"
                 mensajesAgrupados.getOrPut(remitente) { StringBuilder() }
@@ -34,16 +53,27 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
 
             for ((remitente, cuerpo) in mensajesAgrupados) {
                 val textoCompleto = cuerpo.toString()
-                Log.d("SmsReceiver", "SMS de: $remitente")
-                Log.d("SmsReceiver", "Texto: $textoCompleto")
 
-                if (SinpeParser.esMensajeSinpe(textoCompleto)) {
-                    Log.d("SmsReceiver", "SMS de SINPE detectado")
+                val esRemitenteConocido = REMITENTES_SINPE.any { conocido ->
+                    remitente.equals(conocido, ignoreCase = true) ||
+                            remitente.contains(conocido, ignoreCase = true)
+                }
 
-                    val sinpeMessage = SinpeParser.parsearSms(textoCompleto)
+                val esTextoSinpe = SinpeParser.esMensajeSinpe(textoCompleto)
+
+                Log.d("SmsReceiver", "Remitente '$remitente' | conocido=$esRemitenteConocido | textoSINPE=$esTextoSinpe")
+
+                // Procesar si el remitente es conocido O si el texto parece SINPE
+                if (esRemitenteConocido || esTextoSinpe) {
+                    Log.d("SmsReceiver", "Procesando SMS de SINPE de: $remitente")
+
+                    val sinpeMessage = SinpeParser.parsearSms(
+                        texto = textoCompleto,
+                        timestampMs = System.currentTimeMillis()
+                    )
 
                     if (sinpeMessage != null) {
-                        Log.d("SmsReceiver", "Parseado OK - Ref: ${sinpeMessage.referencia}")
+                        Log.d("SmsReceiver", "Parseado OK — Monto: ${sinpeMessage.monto} | Ref: ${sinpeMessage.referencia}")
 
                         val json = gson.toJson(sinpeMessage)
                         val serviceIntent = Intent(context, SinpeForegroundService::class.java).apply {
@@ -53,8 +83,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                         context.startService(serviceIntent)
 
                     } else {
-                        Log.w("SmsReceiver", "No se pudo parsear el SMS de SINPE")
-                        Log.w("SmsReceiver", "Texto original: $textoCompleto")
+                        Log.w("SmsReceiver", "No se pudo parsear — texto: $textoCompleto")
                     }
                 }
             }

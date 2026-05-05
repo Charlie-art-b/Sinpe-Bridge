@@ -1,9 +1,9 @@
 package com.example.sinpe_bridge
-
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import com.example.sinpe_bridge.model.SinpeMessage
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,7 +44,7 @@ import com.example.sinpe_bridge.presentation.viewmodel.SinpeViewModel
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
-
+import java.util.Calendar
 class MainActivity : ComponentActivity() {
 
     private val viewModel: SinpeViewModel by viewModels()
@@ -101,7 +100,7 @@ class MainActivity : ComponentActivity() {
     private fun cargarHistorialSinpe() {
         val smsList = leerSmsBN(this)
         smsList.forEach { smsRaw ->
-            val mensaje = com.example.sinpe_bridge.utils.SinpeParser.parsearSms(smsRaw.cuerpo)
+            val mensaje = com.example.sinpe_bridge.utils.SinpeParser.parsearSms(texto = smsRaw.cuerpo, timestampMs = smsRaw.timestampMs)
             if (mensaje != null) {
                 SinpeRepository.agregarPago(mensaje)
             }
@@ -317,9 +316,24 @@ fun SinpeItemCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Fecha/hora del SMS y timestamp de recepción
+                // Detalle del pago (ej: "Transferencia_SINP", "PAGO", "POR GUAPI")
+                if (item.sinpeMessage.detalle.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = item.sinpeMessage.detalle,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Fecha/hora real de cuando llegó el SMS al teléfono
                 Text(
-                    text = item.sinpeMessage.fechaHora,
+                    text = formatearFechaSms(item.sinpeMessage.timestampMs),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -545,16 +559,34 @@ private fun formatearMonto(monto: Double): String {
     return "₡${formatter.format(monto)}"
 }
 
-private fun tiempoRelativo(timestamp: Long): String {
-    val diffMs = System.currentTimeMillis() - timestamp
-    val diffMin = (diffMs / 60_000).toInt()
+/**
+ * Formatea el timestamp del SMS para mostrarlo en la tarjeta.
+ *
+ * - Hoy:          "9:33 p. m."              (solo hora)
+ * - Esta semana:  "lun 9:33 p. m."          (día abreviado + hora)
+ * - Más antiguo:  "31 may 2024, 8:02 p. m." (fecha completa)
+ */
+/**
+ * Formatea el timestamp para mostrar en la tarjeta.
+ *
+ * - Hoy:          "hoy, 9:33 a. m."          ← agrega "hoy," para no dejar solo la hora
+ * - Esta semana:  "lun, 9:33 a. m."
+ * - Más antiguo:  "31 may 2024, 8:02 p. m."
+ */
+private fun formatearFechaSms(timestampMs: Long): String {
+    val ahora = Calendar.getInstance()
+    val fecha = Calendar.getInstance().apply { timeInMillis = timestampMs }
+
+    val esHoy = ahora.get(Calendar.YEAR) == fecha.get(Calendar.YEAR) &&
+            ahora.get(Calendar.DAY_OF_YEAR) == fecha.get(Calendar.DAY_OF_YEAR)
+
+    val estaSemanaDiff = (ahora.timeInMillis - timestampMs) < 7 * 24 * 60 * 60 * 1000L
+
+    val hora = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestampMs))
+
     return when {
-        diffMin < 1 -> "ahora"
-        diffMin < 60 -> "hace $diffMin min"
-        diffMin < 1440 -> "hace ${diffMin / 60} h"
-        else -> {
-            val sdf = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
-            sdf.format(Date(timestamp))
-        }
+        esHoy -> "hoy, $hora"
+        estaSemanaDiff -> SimpleDateFormat("EEE, h:mm a", Locale.getDefault()).format(Date(timestampMs))
+        else -> SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault()).format(Date(timestampMs))
     }
 }
