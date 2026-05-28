@@ -1,0 +1,39 @@
+trigger:
+- main
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: JavaToolInstaller@0
+  displayName: 'Instalar Java 17'
+  inputs:
+    versionSpec: '17'
+    jdkArchitectureOption: 'x64'
+    jdkSourceOption: 'PreInstalled'
+
+- task: Gradle@3
+  displayName: 'Build con Gradle (assembleDebug)'
+  inputs:
+    workingDirectory: ''
+    gradleWrapperFile: 'gradlew'
+    tasks: 'assembleDebug'
+    publishJUnitResults: true
+    testResultsFiles: '**/TEST-*.xml'
+    javaHomeOption: 'JDKVersion'
+    jdkVersionOption: '1.17'
+
+- task: CopyFiles@2
+  displayName: 'Copiar APK a Staging'
+  inputs:
+    Contents: 'app/build/outputs/apk/debug/*.apk'
+    TargetFolder: '$(build.artifactStagingDirectory)'
+    flattenFolders: true
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publicar Artefactos'
+  inputs:
+    PathtoPublish: '$(build.artifactStagingDirectory)'
+    ArtifactName: 'APK-Debug'
+    publishLocation: 'Container'
