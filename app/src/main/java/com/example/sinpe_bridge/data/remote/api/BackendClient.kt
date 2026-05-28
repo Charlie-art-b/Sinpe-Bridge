@@ -70,7 +70,7 @@ object BackendClient {
             }
 
         } catch (e: Exception) {
-            Log.e("BackendClient", "13. EXCEPCIÓN CRÍTICA en enviarSinpe", e)
+            Log.e("BackendClient", "13. EXCEPCIÓNn CRÍTICA en enviarSinpe", e)
             Log.e("BackendClient", "Stacktrace completo: ${Log.getStackTraceString(e)}")
             false
         } finally {
