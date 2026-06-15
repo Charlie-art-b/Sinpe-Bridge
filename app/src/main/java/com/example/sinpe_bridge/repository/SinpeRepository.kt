@@ -61,6 +61,16 @@ object SinpeRepository {
     }
 
     /**
+     * Actualiza los datos de un pago específico.
+     */
+    fun actualizarPago(id: String, nuevoMensaje: SinpeMessage) {
+        _pagos.update { lista ->
+            lista.map { if (it.id == id) it.copy(sinpeMessage = nuevoMensaje) else it }
+        }
+        Log.d("SinpeRepository", "Pago actualizado: $id")
+    }
+
+    /**
      * Cambia el estado de un pago específico.
      */
     fun actualizarEstado(id: String, estado: EstadoValidacion) {

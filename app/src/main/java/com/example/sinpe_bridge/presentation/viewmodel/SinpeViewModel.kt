@@ -15,7 +15,8 @@ data class SinpeUiState(
     val pagos: List<SinpePaymentItem> = emptyList(),
     val seleccionadoId: String? = null,
     val mensajeError: String? = null,
-    val ultimoResultado: ResultadoValidacion? = null
+    val ultimoResultado: ResultadoValidacion? = null,
+    val pagoAEditar: SinpePaymentItem? = null
 )
 
 data class ResultadoValidacion(
@@ -111,5 +112,32 @@ class SinpeViewModel : ViewModel() {
         val id = _uiState.value.seleccionadoId ?: return
         SinpeRepository.eliminarPago(id)
         _uiState.update { it.copy(seleccionadoId = null) }
+    }
+
+    fun iniciarEdicion() {
+        val id = _uiState.value.seleccionadoId ?: return
+        val pago = _uiState.value.pagos.find { it.id == id } ?: return
+        _uiState.update { it.copy(pagoAEditar = pago) }
+    }
+
+    fun cancelarEdicion() {
+        _uiState.update { it.copy(pagoAEditar = null) }
+    }
+
+    fun guardarEdicion(monto: String, nombre: String, referencia: String, detalle: String, fecha: String, hora: String) {
+        val pagoOriginal = _uiState.value.pagoAEditar ?: return
+        val nuevoMonto = monto.toDoubleOrNull() ?: pagoOriginal.sinpeMessage.monto
+        
+        val nuevoMensaje = pagoOriginal.sinpeMessage.copy(
+            monto = nuevoMonto,
+            nombrePagador = nombre,
+            referencia = referencia,
+            detalle = detalle,
+            fechaEditada = fecha,
+            horaEditada = hora
+        )
+        
+        SinpeRepository.actualizarPago(pagoOriginal.id, nuevoMensaje)
+        _uiState.update { it.copy(pagoAEditar = null) }
     }
 }

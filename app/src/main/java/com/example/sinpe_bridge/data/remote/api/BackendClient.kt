@@ -13,9 +13,9 @@ import java.net.URL
 
 object BackendClient {
 
-    private const val BASE_URL  = "http://10.249.63.141:5062"
+    private const val BASE_URL  = "http://192.168.0.5:5062"
     private const val ENDPOINT  = "/api/voucher/create"
-    private const val TIMEOUT_MS = 120_000
+    private const val TIMEOUT_MS = 120000
 
     private val gson = Gson()
 

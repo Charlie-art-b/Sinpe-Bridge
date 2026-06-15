@@ -17,11 +17,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -128,6 +131,17 @@ fun SinpeBridgeApp(viewModel: SinpeViewModel) {
         )
     }
 
+    // Diálogo de edición
+    uiState.pagoAEditar?.let { pago ->
+        EdicionDialog(
+            pago = pago,
+            onDismiss = { viewModel.cancelarEdicion() },
+            onConfirm = { monto, nombre, ref, det, fecha, hora ->
+                viewModel.guardarEdicion(monto, nombre, ref, det, fecha, hora)
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -173,7 +187,8 @@ fun SinpeBridgeApp(viewModel: SinpeViewModel) {
                 habilitado = uiState.seleccionadoId != null && !estaValidando,
                 validando = estaValidando,
                 onValidar = { viewModel.validar() },
-                onEliminar = { viewModel.eliminar() }
+                onEliminar = { viewModel.eliminar() },
+                onEditar = { viewModel.iniciarEdicion() }
             )
         }
     ) { paddingValues ->
@@ -411,7 +426,8 @@ fun BottomValidarBar(
     habilitado: Boolean,
     validando: Boolean,
     onValidar: () -> Unit,
-    onEliminar: () -> Unit
+    onEliminar: () -> Unit,
+    onEditar: () -> Unit
 ) {
     Surface(
         tonalElevation = 3.dp,
@@ -428,7 +444,7 @@ fun BottomValidarBar(
                 onClick = onEliminar,
                 enabled = habilitado,
                 modifier = Modifier
-                    .weight(0.25f)
+                    .weight(0.2f)
                     .height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, if (habilitado) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant),
@@ -441,12 +457,29 @@ fun BottomValidarBar(
                 )
             }
 
+            // Botón Editar
+            OutlinedButton(
+                onClick = onEditar,
+                enabled = habilitado,
+                modifier = Modifier
+                    .weight(0.2f)
+                    .height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, if (habilitado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Editar",
+                    tint = if (habilitado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+
             // Botón Validar
             Button(
                 onClick = onValidar,
                 enabled = habilitado,
                 modifier = Modifier
-                    .weight(0.75f)
+                    .weight(0.6f)
                     .height(50.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -544,6 +577,85 @@ fun ResultadoDialog(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EdicionDialog(
+    pago: SinpePaymentItem,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, String, String, String) -> Unit
+) {
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val hourFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    
+    val fechaInicial = pago.sinpeMessage.fechaEditada ?: dateFormat.format(Date(pago.sinpeMessage.timestampMs))
+    val horaInicial = pago.sinpeMessage.horaEditada ?: hourFormat.format(Date(pago.sinpeMessage.timestampMs))
+
+    var monto by remember { mutableStateOf(pago.sinpeMessage.monto.toString()) }
+    var nombre by remember { mutableStateOf(pago.sinpeMessage.nombrePagador) }
+    var referencia by remember { mutableStateOf(pago.sinpeMessage.referencia) }
+    var detalle by remember { mutableStateOf(pago.sinpeMessage.detalle) }
+    var fecha by remember { mutableStateOf(fechaInicial) }
+    var hora by remember { mutableStateOf(horaInicial) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Pago SINPE") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = monto,
+                    onValueChange = { monto = it },
+                    label = { Text("Monto") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = { nombre = it },
+                    label = { Text("Nombre Pagador") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = referencia,
+                    onValueChange = { referencia = it },
+                    label = { Text("Referencia") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = detalle,
+                    onValueChange = { detalle = it },
+                    label = { Text("Detalle") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = fecha,
+                    onValueChange = { fecha = it },
+                    label = { Text("Fecha (yyyy-MM-dd)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = hora,
+                    onValueChange = { hora = it },
+                    label = { Text("Hora (HH:mm:ss)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(monto, nombre, referencia, detalle, fecha, hora) }) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 // ---------------------------------------------------------------------------
