@@ -38,16 +38,18 @@ object SinpeRepository {
      * reciente a más antiguo por timestampMs. Evita duplicados por referencia.
      */
     fun cargarLote(mensajes: List<SinpeMessage>) {
-        val existentes = _pagos.value.map { it.sinpeMessage.referencia }.toSet()
-        val nuevos = mensajes
-            .filter { it.referencia !in existentes }
-            .map { SinpePaymentItem(sinpeMessage = it) }
-
         _pagos.update { lista ->
+            val existentes = lista.map { it.sinpeMessage.referencia }.toSet()
+            // Filtramos los que ya existen Y evitamos duplicados dentro del nuevo lote
+            val nuevos = mensajes
+                .filter { it.referencia !in existentes }
+                .distinctBy { it.referencia }
+                .map { SinpePaymentItem(sinpeMessage = it) }
+
             (lista + nuevos)
                 .sortedByDescending { it.sinpeMessage.timestampMs }
         }
-        Log.d("SinpeRepository", "Lote cargado: ${nuevos.size} pagos nuevos")
+        Log.d("SinpeRepository", "Lote procesado. Pagos en total: ${_pagos.value.size}")
     }
 
     /**

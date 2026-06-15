@@ -109,12 +109,25 @@ object SinpeParser {
      * Ejemplos: "Transferencia_SINP", "PAGO", "Pago -64582529", "POR GUAPI"
      */
     private fun extraerDetalle(texto: String): String? {
-        val match = Regex(
-            """SINPE\s+MOVIL\s+de\s+[^.]+\.\s*([^.]+)\.\s*[Rr]eferencia""",
-            RegexOption.IGNORE_CASE
-        ).find(texto) ?: return null
-        val detalle = match.groupValues[1].trim()
-        return detalle.ifEmpty { null }
+        // Buscamos la posición de "Referencia" o "Comprobante" para saber dónde termina el detalle
+        val lower = texto.lowercase()
+        val refIndex = lower.indexOf("referencia")
+            .takeIf { it != -1 } ?: lower.indexOf("comprobante")
+            .takeIf { it != -1 } ?: return null
+
+        // Intentamos determinar dónde empieza el detalle. 
+        // Normalmente es después de "SINPE MOVIL" o del nombre del pagador.
+        val searchAfter = listOf("sinpe movil", "colones").map { lower.indexOf(it) }.filter { it != -1 }.maxOrNull() ?: 0
+        
+        // Buscamos el primer punto después de esa zona, que suele separar el nombre/encabezado del detalle
+        val startOfDetalle = texto.indexOf('.', searchAfter).let { if (it == -1) searchAfter else it + 1 }
+
+        if (startOfDetalle >= refIndex) return null
+
+        val detalle = texto.substring(startOfDetalle, refIndex).trim()
+        
+        // Limpiamos caracteres sobrantes como puntos o dos puntos al final
+        return detalle.trim { it == '.' || it == ':' || it.isWhitespace() }.ifEmpty { null }
     }
 
     private fun extraerReferencia(texto: String): String? {
